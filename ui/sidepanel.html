@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 댓글 탐지기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── 변수 ── */
+    :root {
+      --bg:        #0f0f0f;
+      --surface:   #1a1a1a;
+      --border:    #2a2a2a;
+      --text:      #e8e8e8;
+      --sub:       #777;
+      --low:       #6b7280;
+      --medium:    #d97706;
+      --high:      #dc2626;
+      --mono:      'DM Mono', monospace;
+      --sans:      'Noto Sans KR', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    /* ── 헤더 ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--high);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+    .header-title {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--sub);
+      text-transform: uppercase;
+    }
+
+    /* ── 대기 상태 ── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      height: 200px;
+      color: var(--sub);
+      font-size: 12px;
+      font-family: var(--mono);
+      text-align: center;
+    }
+    .empty-icon {
+      font-size: 28px;
+      opacity: 0.4;
+    }
+
+    /* ── 카드 ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+      animation: slidein 0.22s ease;
+    }
+    @keyframes slidein {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 카드 상단: 라벨 + risk ── */
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .pred-label {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .risk-badge {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      color: #fff;
+    }
+    .risk-badge--low    { background: var(--low); }
+    .risk-badge--medium { background: var(--medium); }
+    .risk-badge--high   { background: var(--high); }
+
+    /* ── 구분선 ── */
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 10px 0;
+    }
+
+    /* ── 수치 행 ── */
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 0;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--sub);
+      font-family: var(--mono);
+    }
+    .stat-value {
+      font-size: 12px;
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    /* ── 프로그레스 바 ── */
+    .bar-wrap {
+      margin-top: 12px;
+    }
+    .bar-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    .bar-bg {
+      background: var(--border);
+      border-radius: 9999px;
+      height: 4px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── top2 후보 ── */
+    .top2-section {
+      margin-top: 12px;
+    }
+    .top2-title {
+      font-size: 10px;
+      color: var(--sub);
+      font-family: var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .top2-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .top2-name {
+      font-family: var(--mono);
+      font-size: 11px;
+      width: 72px;
+      flex-shrink: 0;
+    }
+    .top2-bar-bg {
+      flex: 1;
+      background: var(--border);
+      border-radius: 9999px;
+      height: 3px;
+      overflow: hidden;
+    }
+    .top2-bar-fill {
+      height: 100%;
+      background: var(--sub);
+      border-radius: 9999px;
+      transition: width 0.4s ease;
+    }
+    .top2-bar-fill--first {
+      background: var(--text);
+    }
+    .top2-pct {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--sub);
+      width: 36px;
+      text-align: right;
+    }
+
+    /* ── 작성자 ── */
+    .author-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .author-handle {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--sub);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-dot"></div>
+    <span class="header-title">AI Detector</span>
+  </div>
+
+  <!-- 결과 없을 때 -->
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">🔍</div>
+    <div>분석된 댓글이 없습니다</div>
+    <div>트위터 댓글을 스크롤하면<br/>자동으로 분석이 시작돼요</div>
+  </div>
+
+  <!-- 결과 카드 목록 -->
+  <div id="resultList"></div>
+
+  <script>
+    // ── 헬퍼 ──────────────────────────────────────────────
+
+    const labelMap = {
+      human:    "Human",
+      ai:       "AI 의심",
+      gpt:      "GPT 추정",
+      claude:   "Claude 추정",
+      gemini:   "Gemini 추정",
+      deepseek: "DeepSeek 추정",
+    };
+
+    function pct(val) {
+      return (val * 100).toFixed(1) + "%";
+    }
+
+    function riskColor(level) {
+      return { low: "#6b7280", medium: "#d97706", high: "#dc2626" }[level] ?? "#6b7280";
+    }
+
+    // ── 카드 렌더링 ──────────────────────────────────────
+
+    function createCard(result) {
+      const { pred_label, confidence, ai_score, risk_level, top2, author_id } = result;
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const color = riskColor(risk_level);
+
+      card.innerHTML = `
+        <!-- 상단: 라벨 + risk -->
+        <div class="card-top">
+          <div class="pred-label">${labelMap[pred_label] ?? pred_label}</div>
+          <div class="risk-badge risk-badge--${risk_level}">${risk_level}</div>
+        </div>
+
+        <!-- 수치 -->
+        <div class="stat-row">
+          <span class="stat-label">confidence</span>
+          <span class="stat-value">${pct(confidence)}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">ai_score</span>
+          <span class="stat-value">${pct(ai_score)}</span>
+        </div>
+
+        <!-- ai_score 바 -->
+        <div class="bar-wrap">
+          <div class="bar-bg">
+            <div class="bar-fill" style="width:${pct(ai_score)};background:${color};"></div>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- top2 -->
+        <div class="top2-section">
+          <div class="top2-title">Top 2 후보</div>
+          ${(top2 || []).map((item, i) => `
+            <div class="top2-item">
+              <span class="top2-name">${labelMap[item[0]] ?? item[0]}</span>
+              <div class="top2-bar-bg">
+                <div class="top2-bar-fill ${i === 0 ? 'top2-bar-fill--first' : ''}"
+                     style="width:${pct(item[1])};"></div>
+              </div>
+              <span class="top2-pct">${pct(item[1])}</span>
+            </div>
+          `).join("")}
+        </div>
+
+        <!-- 작성자 -->
+        ${author_id ? `
+          <div class="author-row">
+            <span class="author-handle">${author_id}</span>
+          </div>
+        ` : ""}
+      `;
+
+      return card;
+    }
+
+    // ── 목록 업데이트 ─────────────────────────────────────
+
+    function renderResults(results) {
+      const list = document.getElementById("resultList");
+      const empty = document.getElementById("emptyState");
+
+      // human 제외하고 표시
+      const filtered = results.filter(r => r.pred_label !== "human");
+
+      if (filtered.length === 0) {
+        empty.style.display = "flex";
+        list.innerHTML = "";
+        return;
+      }
+
+      empty.style.display = "none";
+      list.innerHTML = "";
+      filtered.forEach(r => list.appendChild(createCard(r)));
+    }
+
+    // ── chrome.storage 감시 (A가 저장한 데이터 반영) ──────
+
+    chrome.storage.local.get("detectionResults", (data) => {
+      renderResults(data.detectionResults ?? []);
+    });
+
+    chrome.storage.onChanged.addListener((changes) => {
+      if (changes.detectionResults) {
+        renderResults(changes.detectionResults.newValue ?? []);
+      }
+    });
+  </script>
+
+</body>
+</html>
