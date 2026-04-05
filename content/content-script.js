@@ -71,9 +71,9 @@ function requestAnalysis(article, commentData) {
         return;
       }
 
-      if (response?.status === "success" && response.result) {
+      if (response?.status === "success" && response.data) {
         article.setAttribute(ANALYZED_ATTR, "done");
-        renderBadge(article, response.result);
+        renderBadge(article, response.data);
       } else {
         article.setAttribute(ANALYZED_ATTR, "error");
       }
