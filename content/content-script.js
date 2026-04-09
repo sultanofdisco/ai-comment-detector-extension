@@ -8,6 +8,16 @@
 // ---------------------------------------------------------------
 const ANALYZED_ATTR = "data-ai-analyzed";   // 중복 방지용 마킹
 const BADGE_CLASS    = "ai-detector-badge";
+const STATUS_PATH_REGEX = /\/status\/(\d+)/;
+
+function getCurrentStatusId() {
+  const match = window.location.pathname.match(STATUS_PATH_REGEX);
+  return match ? match[1] : null;
+}
+
+function isStatusPage() {
+  return Boolean(getCurrentStatusId());
+}
 
 // ---------------------------------------------------------------
 // 1. 트위터 DOM에서 댓글 데이터 추출
@@ -71,9 +81,9 @@ function requestAnalysis(article, commentData) {
         return;
       }
 
-      if (response?.status === "success" && response.result) {
+      if (response?.status === "success" && response.data) {
         article.setAttribute(ANALYZED_ATTR, "done");
-        renderBadge(article, response.result);
+        renderBadge(article, response.data);
       } else {
         article.setAttribute(ANALYZED_ATTR, "error");
       }
@@ -94,13 +104,14 @@ function renderBadge(article, result) {
   // 이미 배지 있으면 제거 후 재생성
   article.querySelector(`.${BADGE_CLASS}`)?.remove();
 
-  const { pred_label, confidence, risk_level } = result;
+  const { pred_label, ai_score, risk_level } = result;
 
   // human이면 배지 없음
   if (pred_label === "human") return;
 
   // 라벨 텍스트
   const labelMap = {
+    uncertain: "판별 보류",
     ai:       "AI 의심",
     gpt:      "AI 의심 / GPT 추정",
     claude:   "AI 의심 / Claude 추정",
@@ -109,8 +120,8 @@ function renderBadge(article, result) {
   };
   const labelText = labelMap[pred_label] ?? "AI 의심";
 
-  // confidence 퍼센트 (소수점 1자리)
-  const pct = (confidence * 100).toFixed(1);
+  // 메인 배지는 최종 confidence가 아니라 1차 ai_score를 보여준다.
+  const pct = (ai_score * 100).toFixed(1);
 
   // risk_level → 색상
   const colorMap = {
@@ -123,7 +134,7 @@ function renderBadge(article, result) {
   // 배지 엘리먼트 생성
   const badge = document.createElement("span");
   badge.className = BADGE_CLASS;
-  badge.title = `ai_score: ${(result.ai_score * 100).toFixed(1)}%`;
+  badge.title = `ai_score: ${(result.ai_score * 100).toFixed(1)}% / confidence: ${(result.confidence * 100).toFixed(1)}%`;
   badge.style.cssText = `
     display: inline-flex;
     align-items: center;
@@ -163,9 +174,17 @@ function renderBadge(article, result) {
 function processArticle(article) {
   // 이미 분석했거나 진행 중이면 스킵
   if (article.hasAttribute(ANALYZED_ATTR)) return;
+  if (!isStatusPage()) return;
 
   const data = extractCommentData(article);
   if (!data) return;
+  const rootStatusId = getCurrentStatusId();
+
+  // 메인 게시글은 댓글 분석 대상에서 제외한다.
+  if (!data.comment_id || data.comment_id === rootStatusId) {
+    article.setAttribute(ANALYZED_ATTR, "skipped");
+    return;
+  }
 
   requestAnalysis(article, data);
 }

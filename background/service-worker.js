@@ -4,6 +4,31 @@
  */
 
 const SERVER_BASE_URL = "http://127.0.0.1:8000"; // API 명세서 기준 로컬 주소 [cite: 13, 246]
+const CACHE_SCHEMA_VERSION = "2026-04-07-v2";
+const CACHE_TTL_MS = 1000 * 60 * 30;
+
+function isUsableCache(entry) {
+    if (!entry || !entry.pred_label) return false;
+    if (entry._schema_version !== CACHE_SCHEMA_VERSION) return false;
+    if (!entry._cached_at) return false;
+
+    const cachedAt = Date.parse(entry._cached_at);
+    if (Number.isNaN(cachedAt)) return false;
+
+    return (Date.now() - cachedAt) <= CACHE_TTL_MS;
+}
+
+async function purgeStaleResultCache() {
+    const allEntries = await chrome.storage.local.get(null);
+    const staleKeys = Object.entries(allEntries)
+        .filter(([, value]) => value && value.pred_label && !isUsableCache(value))
+        .map(([key]) => key);
+
+    if (staleKeys.length > 0) {
+        await chrome.storage.local.remove(staleKeys);
+        console.log("오래되었거나 호환되지 않는 캐시 삭제:", staleKeys.length);
+    }
+}
 
 // 1. 서버 상태 체크 (/health) [cite: 44, 201]
 async function checkServerHealth() {
@@ -22,7 +47,12 @@ async function checkServerHealth() {
 
 // 확장 프로그램 시작 시 1회 실행 [cite: 55]
 chrome.runtime.onInstalled.addListener(() => {
+    purgeStaleResultCache();
     checkServerHealth();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    purgeStaleResultCache();
 });
 
 // 2. 메시지 리스너 (Content Script로부터 데이터 수신)
@@ -35,14 +65,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // 3. 분석 요청 처리 함수
 async function handleAnalyzeRequest(payload, sendResponse) {
-    const { comment_id, text } = payload;
+    const { comment_id } = payload;
+    const cacheKey = comment_id ?? `${payload.author_id ?? "unknown"}::${payload.timestamp ?? "no-time"}::${(payload.text ?? "").slice(0, 30)}`;
 
     // 중복 요청 방지: 이미 분석된 데이터인지 storage 확인 [cite: 61, 135]
-    const cache = await chrome.storage.local.get(comment_id);
-    if (cache[comment_id]) {
-        console.log("캐시된 결과 반환:", comment_id);
-        sendResponse({ status: "success", data: cache[comment_id] });
+    const cache = await chrome.storage.local.get(cacheKey);
+    if (isUsableCache(cache[cacheKey])) {
+        console.log("캐시된 결과 반환:", cacheKey);
+        sendResponse({ status: "success", data: cache[cacheKey] });
         return;
+    }
+
+    if (cache[cacheKey]) {
+        await chrome.storage.local.remove(cacheKey);
     }
 
     try {
@@ -66,12 +101,19 @@ async function handleAnalyzeRequest(payload, sendResponse) {
         }
 
         const result = await response.json();
+        const enrichedResult = {
+            ...result,
+            author_id: payload.author_id ?? "",
+            _cache_key: cacheKey,
+            _schema_version: CACHE_SCHEMA_VERSION,
+            _cached_at: new Date().toISOString(),
+        };
 
         // 분석 결과 저장 (storage.local) [cite: 136, 205]
         // 결과 필드: pred_label, confidence, ai_score, risk_level 등 [cite: 78, 79, 80, 85]
-        await chrome.storage.local.set({ [comment_id]: result });
+        await chrome.storage.local.set({ [cacheKey]: enrichedResult });
 
-        sendResponse({ status: "success", data: result });
+        sendResponse({ status: "success", data: enrichedResult });
 
     } catch (error) {
         console.error("분석 실패:", error);

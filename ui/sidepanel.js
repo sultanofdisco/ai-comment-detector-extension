@@ -7,6 +7,7 @@
 
 const labelMap = {
   human: "Human",
+  uncertain: "판별 보류",
   ai: "AI 의심",
   gpt: "GPT 추정",
   claude: "Claude 추정",
