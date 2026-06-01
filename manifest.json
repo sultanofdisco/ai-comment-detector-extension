@@ -22,10 +22,27 @@
         "https://twitter.com/*"
       ],
       "js": [
+        "content/account-analyzer.js",
         "content/content-script.js"
       ],
       "css": [
         "content/injector.css"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/vendor/franc-min/index.js",
+        "content/vendor/franc-min/data.js",
+        "content/vendor/franc-min/expressions.js",
+        "content/vendor/trigram-utils/index.js",
+        "content/vendor/collapse-white-space/index.js",
+        "content/vendor/n-gram/index.js"
+      ],
+      "matches": [
+        "https://x.com/*",
+        "https://twitter.com/*"
       ]
     }
   ],

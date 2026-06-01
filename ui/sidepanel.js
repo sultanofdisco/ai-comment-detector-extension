@@ -1,4 +1,4 @@
-const CACHE_SCHEMA_VERSION = "2026-04-12-v5";
+const CACHE_SCHEMA_VERSION = "2026-05-12-v10";
 
 const labelMap = {
   human: "Human",
@@ -16,6 +16,22 @@ function pct(value) {
 
 function riskColor(level) {
   return { low: "#6b7280", medium: "#d97706", high: "#dc2626" }[level] ?? "#6b7280";
+}
+
+function verdictLabel(verdict) {
+  return {
+    suspicious: "Suspicious",
+    borderline: "Borderline",
+    likely_human: "Likely Human",
+  }[verdict] ?? verdict;
+}
+
+function verdictColor(verdict) {
+  return {
+    suspicious: "#b91c1c",
+    borderline: "#b45309",
+    likely_human: "#065f46",
+  }[verdict] ?? "#374151";
 }
 
 function escapeHtml(value) {
@@ -130,6 +146,89 @@ function buildTop2Markup(top2) {
     .join("");
 }
 
+function buildLanguageDistributionMarkup(distribution) {
+  const entries = Object.entries(distribution ?? {}).sort((left, right) => right[1] - left[1]);
+  if (entries.length === 0) {
+    return `<span class="language-pill language-pill--muted">No language data</span>`;
+  }
+
+  return entries
+    .map(
+      ([languageCode, count]) => `
+        <span class="language-pill">
+          <strong>${escapeHtml(languageCode)}</strong>
+          ${escapeHtml(String(count))}
+        </span>
+      `
+    )
+    .join("");
+}
+
+function buildAccountProfileMarkup(profile) {
+  if (!profile) {
+    return "";
+  }
+
+  const highRatioThresholdLabel = (0.7 * 100).toFixed(0);
+
+  return `
+    <div class="account-profile">
+      <div class="account-profile__top">
+        <div class="account-profile__title">Account Profile</div>
+        <div class="account-profile__verdict" style="background:${verdictColor(profile.verdict)};">
+          ${escapeHtml(verdictLabel(profile.verdict))}
+        </div>
+      </div>
+
+      <div class="account-profile__meta">
+        <span>${escapeHtml(String(profile.totalComments))} recent replies</span>
+        <span>${escapeHtml(String(profile.uniqueLanguageCount))} languages</span>
+        <span>${escapeHtml(String(profile.koreanCommentCount))} Korean</span>
+      </div>
+
+      <div class="account-profile__languages">
+        ${buildLanguageDistributionMarkup(profile.languageDistribution)}
+      </div>
+
+      <div class="account-profile__stats">
+        <div class="stat-row">
+          <span class="stat-label">mean suspicion</span>
+          <span class="stat-value">${pct(profile.aiSuspicion.mean)}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">max suspicion</span>
+          <span class="stat-value">${pct(profile.aiSuspicion.max)}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">ratio &gt; ${highRatioThresholdLabel}% (top 5)</span>
+          <span class="stat-value">${pct(profile.aiSuspicion.highRatioAboveThreshold)}</span>
+        </div>
+      </div>
+
+      ${(profile.recentComments?.length ?? 0) > 0 ? `
+        <div class="top2-section" style="margin-top:12px;">
+          <div class="top2-title">Recent replies</div>
+          <div style="display:grid;gap:8px;margin-top:8px;">
+            ${profile.recentComments
+              .map(
+                (comment, index) => `
+                  <div style="padding:10px 12px;border-radius:10px;background:#111827;color:#d1d5db;line-height:1.5;">
+                    <div style="display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#9ca3af;">
+                      <span>#${index + 1} ${escapeHtml(String(comment.languageCode ?? "und").toUpperCase())}</span>
+                      <span>${comment.aiScore == null ? "Skipped" : pct(comment.aiScore)}</span>
+                    </div>
+                    <div style="margin-top:6px;">${escapeHtml(truncateText(comment.text, 120))}</div>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
 function createCard(result) {
   const {
     pred_label,
@@ -139,8 +238,13 @@ function createCard(result) {
     top2,
     author_id,
     text,
+    reply_mentions_text,
+    text_with_reply_mentions,
     url,
     root_post_text,
+    root_post_reply_mentions_text,
+    root_post_text_with_reply_mentions,
+    account_profile,
     _fp_exported_at,
     _fp_export_status,
   } = result;
@@ -153,7 +257,19 @@ function createCard(result) {
   card.style.borderColor = _fp_exported_at ? "#065f46" : "";
 
   const previewText = truncateText(text);
+  const replyMentionsPreviewText = truncateText(reply_mentions_text || "(No reply mentions detected)", 120);
+  const combinedPreviewText = truncateText(text_with_reply_mentions || text, 180);
   const rootPreviewText = truncateText(root_post_text || "(Root post not cached yet)", 120);
+  const rootReplyMentionsPreviewText = truncateText(
+    root_post_reply_mentions_text || "(No root reply mentions detected)",
+    120
+  );
+  const rootCombinedPreviewText = truncateText(root_post_text_with_reply_mentions || root_post_text, 180);
+  const hasCombinedCommentText =
+    Boolean(text_with_reply_mentions?.trim()) && text_with_reply_mentions.trim() !== String(text ?? "").trim();
+  const hasCombinedRootText =
+    Boolean(root_post_text_with_reply_mentions?.trim()) &&
+    root_post_text_with_reply_mentions.trim() !== String(root_post_text ?? "").trim();
   const footerText = _fp_exported_at
     ? `Saved to FP CSV (${_fp_export_status ?? "saved"})`
     : "Click this card to append the comment to the FP CSV.";
@@ -184,9 +300,33 @@ function createCard(result) {
     </div>
 
     <div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:#151515;color:#9ca3af;line-height:1.5;">
+      <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Reply Mentions</div>
+      ${escapeHtml(replyMentionsPreviewText)}
+    </div>
+
+    ${hasCombinedCommentText ? `
+      <div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:#111827;color:#d1d5db;line-height:1.5;">
+        <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;color:#9ca3af;">Stage1 Input</div>
+        ${escapeHtml(combinedPreviewText)}
+      </div>
+    ` : ""}
+
+    <div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:#151515;color:#9ca3af;line-height:1.5;">
       <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Root Post</div>
       ${escapeHtml(rootPreviewText)}
     </div>
+
+    <div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:#151515;color:#9ca3af;line-height:1.5;">
+      <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Root Reply Mentions</div>
+      ${escapeHtml(rootReplyMentionsPreviewText)}
+    </div>
+
+    ${hasCombinedRootText ? `
+      <div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:#111827;color:#d1d5db;line-height:1.5;">
+        <div style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;color:#9ca3af;">Root Collected Raw</div>
+        ${escapeHtml(rootCombinedPreviewText)}
+      </div>
+    ` : ""}
 
     <hr class="divider" />
 
@@ -194,6 +334,8 @@ function createCard(result) {
       <div class="top2-title">Top 2</div>
       ${buildTop2Markup(top2)}
     </div>
+
+    ${buildAccountProfileMarkup(account_profile)}
 
     ${author_id ? `
       <div class="author-row">

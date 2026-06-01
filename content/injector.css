@@ -76,3 +76,302 @@
   pointer-events: none;
   z-index: 9999;
 }
+
+.ai-detector-account-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #dbeafe;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, opacity 0.16s ease;
+}
+
+.ai-detector-account-button:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.55);
+  color: #eff6ff;
+}
+
+.ai-detector-account-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.ai-detector-account-button[data-state="ready"] {
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #bbf7d0;
+}
+
+.ai-detector-account-button[data-state="error"] {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+
+.ai-detector-account-reply-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.88);
+  color: #e5e7eb;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.ai-detector-account-reply-pill--high {
+  border-color: rgba(248, 113, 113, 0.72);
+  color: #fecaca;
+}
+
+.ai-detector-account-reply-pill--medium {
+  border-color: rgba(251, 191, 36, 0.72);
+  color: #fde68a;
+}
+
+.ai-detector-account-reply-pill--low {
+  border-color: rgba(52, 211, 153, 0.6);
+  color: #bbf7d0;
+}
+
+.ai-detector-account-reply-pill--muted {
+  border-color: rgba(148, 163, 184, 0.45);
+  color: #cbd5e1;
+}
+
+article[data-ai-detector-account-comment-key] {
+  position: relative;
+}
+
+article[data-ai-detector-account-tone="high"] {
+  box-shadow: inset 3px 0 0 rgba(248, 113, 113, 0.9);
+}
+
+article[data-ai-detector-account-tone="medium"] {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.85);
+}
+
+article[data-ai-detector-account-tone="low"] {
+  box-shadow: inset 3px 0 0 rgba(52, 211, 153, 0.8);
+}
+
+article[data-ai-detector-account-tone="muted"] {
+  box-shadow: inset 3px 0 0 rgba(148, 163, 184, 0.6);
+}
+
+.ai-detector-account-view {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(2, 6, 23, 0.96));
+  color: #f8fafc;
+  box-shadow: 0 22px 60px rgba(2, 6, 23, 0.45);
+  z-index: 2147483646;
+  backdrop-filter: blur(14px);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.ai-detector-account-view__header,
+.ai-detector-account-view__summary-top,
+.ai-detector-account-view__sample-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-detector-account-view__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ai-detector-account-view__actions button,
+.ai-detector-account-view__sample {
+  font: inherit;
+}
+
+.ai-detector-account-view__actions button {
+  padding: 7px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.ai-detector-account-view__actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.ai-detector-account-view__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.ai-detector-account-view__handle,
+.ai-detector-account-view__title {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.ai-detector-account-view__status {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.72);
+  color: #dbeafe;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-detector-account-view__status--error {
+  background: rgba(127, 29, 29, 0.9);
+  color: #fee2e2;
+}
+
+.ai-detector-account-view__summary {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(71, 85, 105, 0.4);
+}
+
+.ai-detector-account-view__verdict {
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.ai-detector-account-view__stats,
+.ai-detector-account-view__languages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.ai-detector-account-view__stats span,
+.ai-detector-account-view__languages {
+  line-height: 1.5;
+}
+
+.ai-detector-account-view__stats span {
+  padding: 5px 9px;
+  border-radius: 9999px;
+  background: rgba(30, 41, 59, 0.88);
+}
+
+.ai-detector-account-view__section-title {
+  margin-top: 16px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #e2e8f0;
+}
+
+.ai-detector-account-view__samples {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.ai-detector-account-view__sample {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(71, 85, 105, 0.4);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.66);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-detector-account-view__sample:hover {
+  border-color: rgba(96, 165, 250, 0.5);
+  background: rgba(15, 23, 42, 0.86);
+}
+
+.ai-detector-account-view__sample-index,
+.ai-detector-account-view__sample-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ai-detector-account-view__sample-score {
+  padding: 4px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ai-detector-account-view__sample-score--high {
+  background: rgba(127, 29, 29, 0.92);
+  color: #fecaca;
+}
+
+.ai-detector-account-view__sample-score--medium {
+  background: rgba(120, 53, 15, 0.92);
+  color: #fde68a;
+}
+
+.ai-detector-account-view__sample-score--low {
+  background: rgba(6, 78, 59, 0.92);
+  color: #bbf7d0;
+}
+
+.ai-detector-account-view__sample-score--muted {
+  background: rgba(51, 65, 85, 0.92);
+  color: #cbd5e1;
+}
+
+.ai-detector-account-view__sample-text {
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #f8fafc;
+}
+
+.ai-detector-account-view__empty {
+  margin-top: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.66);
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
