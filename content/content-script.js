@@ -15,10 +15,15 @@ const ACCOUNT_PROFILE_AI_THRESHOLD = 0.7;
 const ANALYZE_QUEUE_MAX_CONCURRENT = 2;
 let extensionContextInvalidated = false;
 let observer;
+let statusRescanTimer;
+let navigationListenerInstalled = false;
+let activeStatusPageId = null;
+let lastTrackedPath = "";
 const aiScorePromises = new Map();
 const pendingArticleAnalyses = [];
 let activeArticleAnalysisCount = 0;
 let activeAccountViewRunId = 0;
+const STATUS_RESCAN_INTERVAL_MS = 2000;
 
 function shouldTreatAsContextInvalidation(message) {
   const normalized = String(message ?? "").toLowerCase();
@@ -58,7 +63,7 @@ function invalidateExtensionContext(reason) {
   }
 
   extensionContextInvalidated = true;
-  observer?.disconnect?.();
+  stopStatusPageAnalysis();
   console.warn("[AI Detector] extension context is no longer available:", reason);
 }
 
@@ -1105,7 +1110,8 @@ function renderBadge(article, result) {
 }
 
 function processArticle(article) {
-  if (article.hasAttribute(ANALYZED_ATTR)) return;
+  const analyzedState = article.getAttribute(ANALYZED_ATTR);
+  if (analyzedState && analyzedState !== "error") return;
   if (!isStatusPage()) return;
 
   const data = extractCommentData(article);
@@ -1124,7 +1130,36 @@ function scanAllArticles() {
   document.querySelectorAll("article").forEach(processArticle);
 }
 
+function resetAnalysisQueue() {
+  pendingArticleAnalyses.length = 0;
+  activeArticleAnalysisCount = 0;
+}
+
+function clearAnalyzedMarks() {
+  document.querySelectorAll(`article[${ANALYZED_ATTR}]`).forEach((article) => {
+    article.removeAttribute(ANALYZED_ATTR);
+  });
+}
+
+function stopStatusPageAnalysis() {
+  observer?.disconnect?.();
+  observer = undefined;
+
+  if (statusRescanTimer) {
+    window.clearInterval(statusRescanTimer);
+    statusRescanTimer = undefined;
+  }
+
+  resetAnalysisQueue();
+  activeStatusPageId = null;
+}
+
 function startStatusPageAnalysis() {
+  if (observer) {
+    scanAllArticles();
+    return;
+  }
+
   observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
@@ -1140,24 +1175,110 @@ function startStatusPageAnalysis() {
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
+
+  statusRescanTimer = window.setInterval(() => {
+    if (!isStatusPage()) {
+      return;
+    }
+    scanAllArticles();
+  }, STATUS_RESCAN_INTERVAL_MS);
+
   scanAllArticles();
 }
 
-function initializeContentScript() {
+function getTrackedPath() {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function handleRouteChange() {
+  if (extensionContextInvalidated) {
+    return;
+  }
+
   const triggeredAccountHandle = getTriggeredAccountViewHandle();
   if (triggeredAccountHandle) {
+    stopStatusPageAnalysis();
     void runAccountRepliesView(triggeredAccountHandle);
     console.log("[AI Detector] account replies view loaded");
     return;
   }
 
-  if (isStatusPage()) {
-    startStatusPageAnalysis();
-    console.log("[AI Detector] status-page analyzer loaded");
+  if (!isStatusPage()) {
+    if (observer || activeStatusPageId) {
+      stopStatusPageAnalysis();
+      console.log("[AI Detector] left status page");
+    }
     return;
   }
 
-  console.log("[AI Detector] content-script loaded");
+  const statusId = getCurrentStatusId();
+  if (!statusId) {
+    return;
+  }
+
+  if (activeStatusPageId !== statusId) {
+    stopStatusPageAnalysis();
+    clearAnalyzedMarks();
+    activeStatusPageId = statusId;
+    startStatusPageAnalysis();
+    console.log("[AI Detector] status-page analyzer loaded:", statusId);
+    return;
+  }
+
+  startStatusPageAnalysis();
+}
+
+function installSpaNavigationListener() {
+  if (navigationListenerInstalled) {
+    return;
+  }
+
+  navigationListenerInstalled = true;
+  lastTrackedPath = getTrackedPath();
+
+  const scheduleRouteChange = () => {
+    window.setTimeout(() => {
+      const currentPath = getTrackedPath();
+      if (currentPath === lastTrackedPath) {
+        return;
+      }
+
+      lastTrackedPath = currentPath;
+      handleRouteChange();
+    }, 0);
+  };
+
+  window.addEventListener("popstate", scheduleRouteChange);
+
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+
+  history.pushState = function pushState(...args) {
+    originalPushState.apply(this, args);
+    scheduleRouteChange();
+  };
+
+  history.replaceState = function replaceState(...args) {
+    originalReplaceState.apply(this, args);
+    scheduleRouteChange();
+  };
+
+  window.setInterval(() => {
+    const currentPath = getTrackedPath();
+    if (currentPath !== lastTrackedPath) {
+      lastTrackedPath = currentPath;
+      handleRouteChange();
+    }
+  }, 500);
+}
+
+function initializeContentScript() {
+  installSpaNavigationListener();
+  handleRouteChange();
+
+  if (!isStatusPage() && !getTriggeredAccountViewHandle()) {
+    console.log("[AI Detector] content-script loaded (waiting for status page)");
+  }
 }
 
 initializeContentScript();
