@@ -1,5 +1,6 @@
 const ANALYZED_ATTR = "data-ai-analyzed";
 const BADGE_CLASS = "ai-detector-badge";
+const XAI_TRIGGER_CLASS = "ai-detector-xai-trigger";
 const ACCOUNT_BUTTON_CLASS = "ai-detector-account-button";
 const ACCOUNT_REPLY_PILL_CLASS = "ai-detector-account-reply-pill";
 const ACCOUNT_VIEW_PANEL_ID = "ai-detector-account-view";
@@ -463,6 +464,7 @@ function runQueuedArticleAnalysis(article, commentData) {
       if (response?.status === "success" && response.data) {
         article.setAttribute(ANALYZED_ATTR, "done");
         renderBadge(article, response.data);
+        renderXAITrigger(article, response.data);
         return;
       }
 
@@ -1013,8 +1015,42 @@ function exportFalsePositive(result, badge) {
     });
 }
 
+function renderXAITrigger(article, result) {
+  article.querySelector(`.${XAI_TRIGGER_CLASS}`)?.remove();
+
+  if (result.pred_label === "human" || !result.reason?.trim()) {
+    return;
+  }
+
+  const trigger = document.createElement("span");
+  trigger.className = XAI_TRIGGER_CLASS;
+
+  const label = document.createElement("span");
+  label.className = "ai-detector-xai-trigger__label";
+  label.textContent = "XAI";
+
+  const tooltip = document.createElement("span");
+  tooltip.className = "ai-detector-xai-tooltip";
+  tooltip.textContent = result.reason.trim();
+
+  trigger.appendChild(label);
+  trigger.appendChild(tooltip);
+
+  const badge = article.querySelector(`.${BADGE_CLASS}`);
+  if (badge) {
+    badge.insertAdjacentElement("afterend", trigger);
+    return;
+  }
+
+  const authorEl = article.querySelector('[data-testid="User-Name"]');
+  if (authorEl) {
+    authorEl.appendChild(trigger);
+  }
+}
+
 function renderBadge(article, result) {
   article.querySelector(`.${BADGE_CLASS}`)?.remove();
+  article.querySelector(`.${XAI_TRIGGER_CLASS}`)?.remove();
   article.querySelector(`.${ACCOUNT_BUTTON_CLASS}`)?.remove();
 
   const { pred_label, ai_score, risk_level } = result;
